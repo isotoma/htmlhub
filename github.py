@@ -23,39 +23,42 @@ class JSONProtocol(Protocol):
     def connectionLost(self, reason):
         self.finished.callback(json.loads("".join(self.data)))
 
-def git_request(request):
-    print request
-    finished = Deferred()
+agent = Agent(reactor, WebClientContextFactory())
+endpoint = "https://api.github.com"
 
-    def cb_response(response):
-        response.deliverBody(JSONProtocol(finished))
-
-    agent.request(
-        'GET',
-        endpoint + request,
-        Headers({
-            'Accept': ['application/vnd.github.v3+json'],
-            'Authorization': [self.authorization],
-            'User-Agent': ['htmlhub/GitHubClient'],
-        }),
-        None
-    ).addCallback(cb_response)
-
-    return finished
 
 class GitHubClient(object):
 
-    endpoint = "https://api.github.com"
 
     def __init__(self, username, password):
         self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
-        self.contextFactory = WebClientContextFactory()
-        self.agent = Agent(reactor, self.contextFactory)
 
     def get_branch(self, owner, repository, branch):
         # todo, a spot of caching
         branch = GitBranch(self, owner, repository, branch)
-        branch.initialise()
+        def _(ignored):
+            return branch
+        return branch.initialise().addCallback(_)
+
+    def git_request(self, request):
+        print request
+        finished = Deferred()
+
+        def cb_response(response):
+            response.deliverBody(JSONProtocol(finished))
+
+        agent.request(
+            'GET',
+            endpoint + request,
+            Headers({
+                'Accept': ['application/vnd.github.v3+json'],
+                'Authorization': [self.authorization],
+                'User-Agent': ['htmlhub/GitHubClient'],
+            }),
+            None
+        ).addCallback(cb_response)
+
+        return finished
 
 class GitBranch(object):
 
@@ -65,51 +68,65 @@ class GitBranch(object):
         self.repository = repository
         self.branch_name = branch_name
         self.branch_sha = None
+        self.html_templates_sha = None
+        self.passwd = None
+
+    def git_request(self, request):
+        return self.client.git_request(request)
+
+    def get_branch_sha(self, results):
+        for d in results:
+            if d['name'] == self.branch_name:
+                self.branch_sha = d['commit']['sha']
+                return
+        raise KeyError()
+
+    def get_html_templates_sha(self, ignored):
+        def _(results):
+            for d in results['tree']:
+                if d['path'] == 'html-templates':
+                    self.html_templates_sha = d['sha']
+        return self.git_tree_request(self.branch_sha).addCallback(_)
+
+    def get_passwd(self, ignored):
+        def _(results):
+            self.passwd = results
+        self.get_html_file(["passwd"]).addCallback(_)
 
     def initialise(self):
-        def get_branch_sha(results):
-            for d in results:
-                if d['name'] == self.branch_name:
-                    self.branch_sha = d['sha']
-                    return
-            raise KeyError()
-        return git_request(
-            '/repos/%s/%s/branches' % (owner, repository)
+        return self.git_request(
+            '/repos/%s/%s/branches' % (self.owner, self.repository)
         ).addCallback(
-            get_branch_sha
-        ).addCallback(get_passwd)
+            self.get_branch_sha
+        ).addCallback(
+            self.get_html_templates_sha
+        ).addCallback(
+            self.get_passwd
+        )
 
-            #addCallback(partial(git_get_file_sha, owner, repository, filepath)).\
-            #addCallback(partial(git_get_blob, owner, repository)).\
-            #addCallback(extract_content).\
-            #addErrback(cb_error)
+    def git_tree_request(self, sha):
+            return self.git_request(str('/repos/%s/%s/git/trees/%s' % (self.owner, self.repository, sha)))
 
+    def get_html_file(self, segments, parent_sha=None):
+        if parent_sha is None:
+            parent_sha = self.html_templates_sha
+        def _(results):
+            leaf = segments.pop(0)
+            sha = None
+            for d in results['tree']:
+                if d['path'] == leaf:
+                    sha = d['sha']
+            if sha is None:
+                return None
+            if segments:
+                return self.git_get_html_file(segments, sha)
+            else:
+                return self.git_get_blob(sha)
+        return self.git_tree_request(parent_sha).addCallback(_)
 
-
-
-
-    def git_tree_request(owner, repository, sha):
-        return git_request(str('/repos/%s/%s/git/trees/%s' % (owner, repository, sha)))
-
-def git_get_file_sha(owner, repository, segments, root_sha):
-    def _(results):
-        leaf = segments.pop(0)
-        sha = None
-        for d in results['tree']:
-            if d['path'] == leaf:
-                sha = d['sha']
-        if sha is None:
-            return None
-        if segments:
-            return git_get_file_sha(owner, repository, segments, sha)
-        else:
-            return sha
-    return git_tree_request(owner, repository, root_sha).addCallback(_)
-
-def git_get_blob(owner, repository, sha):
-    return git_request(str('/repos/%s/%s/git/blobs/%s' % (owner,repository, sha)))
-
-def extract_content(results):
-    content = results['content']
-    return b64decode(content)
-
+    def git_get_blob(self, sha):
+        def _(results):
+            return b64decode(results['content'])
+        return self.git_request(
+            str('/repos/%s/%s/git/blobs/%s' % (self.owner, self.repository, sha))
+        ).addCallback(_)
