@@ -1,0 +1,3 @@
+Twisted
+PyOpenSSL
+service_identity
