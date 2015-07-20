@@ -4,7 +4,7 @@ from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
 from twisted.internet.ssl import ClientContextFactory
 from twisted.internet.protocol import Protocol
-from base64 import b64encode
+from base64 import b64encode, b64decode
 import json
 
 password = open("token").read().strip()
@@ -88,6 +88,13 @@ def git_get_file_sha(root_sha, segments):
             return sha
     return git_tree_request(root_sha).addCallback(_)
 
+def git_get_blob(sha):
+    return git_request(str('/repos/%s/%s/git/blobs/%s' % (owner,repository, sha)))
+
+def extract_content(results):
+    content = results['content']
+    return b64decode(content)
+
 def get_home(branch_shas):
     root_sha = branch_shas['master']
     return git_get_file_sha(root_sha, ['html-templates', 'home.html'])
@@ -95,6 +102,8 @@ def get_home(branch_shas):
 git_request('/repos/%s/%s/branches' % (owner, repository),).\
     addCallback(get_branch_shas).\
     addCallback(get_home).\
+    addCallback(git_get_blob).\
+    addCallback(extract_content).\
     addCallback(print_results).\
     addErrback(cb_error).\
     addBoth(cbShutdown)
