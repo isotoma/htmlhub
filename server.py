@@ -12,8 +12,6 @@ from twisted.cred import credentials
 
 import github
 
-import wingdbstub
-
 username = 'winjer'
 password = open("token").read().strip()
 

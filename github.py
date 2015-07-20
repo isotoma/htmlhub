@@ -37,6 +37,19 @@ class GitHubClient(object):
     def __init__(self, username, password):
         self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
         self.cache = {}
+        reactor.callLater(240, self.housekeeping)
+
+    def housekeeping(self):
+        print "housekeeping"
+        delete = []
+        now = time.time()
+        for key, value in self.cache.items():
+            if now - value[0] > 120:
+                delete.append(key)
+        for d in delete:
+            print "deleting", d
+            del self.cache[d]
+        reactor.callLater(240, self.housekeeping)
 
     def get_branch(self, owner, repository, branch_name):
         now = time.time()
