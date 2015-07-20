@@ -8,20 +8,11 @@ from functools import partial
 from base64 import b64encode, b64decode
 import json
 
-username = 'winjer'
-endpoint = "https://api.github.com"
-password = open("token").read().strip()
-authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
-
 class WebClientContextFactory(ClientContextFactory):
     def getContext(self, hostname, port):
         return ClientContextFactory.getContext(self)
 
-contextFactory = WebClientContextFactory()
-
-agent = Agent(reactor, contextFactory)
-
-class Consumer(Protocol):
+class JSONProtocol(Protocol):
     def __init__(self, finished):
         self.finished = finished
         self.data = []
@@ -32,44 +23,73 @@ class Consumer(Protocol):
     def connectionLost(self, reason):
         self.finished.callback(json.loads("".join(self.data)))
 
-
-def cb_error(error):
-    print error
-
 def git_request(request):
     print request
     finished = Deferred()
 
     def cb_response(response):
-        response.deliverBody(Consumer(finished))
+        response.deliverBody(JSONProtocol(finished))
 
     agent.request(
         'GET',
         endpoint + request,
         Headers({
             'Accept': ['application/vnd.github.v3+json'],
-            'Authorization': [authorization],
-            'User-Agent': ['htmlhub'],
+            'Authorization': [self.authorization],
+            'User-Agent': ['htmlhub/GitHubClient'],
         }),
         None
-    ).addCallback(cb_response).addErrback(cb_error)
+    ).addCallback(cb_response)
 
     return finished
 
+class GitHubClient(object):
 
-def cbShutdown(ignored):
-    reactor.stop()
+    endpoint = "https://api.github.com"
 
-def print_results(results):
-    print results
+    def __init__(self, username, password):
+        self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
+        self.contextFactory = WebClientContextFactory()
+        self.agent = Agent(reactor, self.contextFactory)
 
-def get_branch_sha(branch, results):
-    for d in results:
-        if d['name'] == branch:
-            return d['commit']['sha']
+    def get_branch(self, owner, repository, branch):
+        # todo, a spot of caching
+        branch = GitBranch(self, owner, repository, branch)
+        branch.initialise()
 
-def git_tree_request(owner, repository, sha):
-    return git_request(str('/repos/%s/%s/git/trees/%s' % (owner, repository, sha)))
+class GitBranch(object):
+
+    def __init__(self, client, owner, repository, branch_name):
+        self.client = client
+        self.owner = owner
+        self.repository = repository
+        self.branch_name = branch_name
+        self.branch_sha = None
+
+    def initialise(self):
+        def get_branch_sha(results):
+            for d in results:
+                if d['name'] == self.branch_name:
+                    self.branch_sha = d['sha']
+                    return
+            raise KeyError()
+        return git_request(
+            '/repos/%s/%s/branches' % (owner, repository)
+        ).addCallback(
+            get_branch_sha
+        ).addCallback(get_passwd)
+
+            #addCallback(partial(git_get_file_sha, owner, repository, filepath)).\
+            #addCallback(partial(git_get_blob, owner, repository)).\
+            #addCallback(extract_content).\
+            #addErrback(cb_error)
+
+
+
+
+
+    def git_tree_request(owner, repository, sha):
+        return git_request(str('/repos/%s/%s/git/trees/%s' % (owner, repository, sha)))
 
 def git_get_file_sha(owner, repository, segments, root_sha):
     def _(results):
@@ -92,13 +112,4 @@ def git_get_blob(owner, repository, sha):
 def extract_content(results):
     content = results['content']
     return b64decode(content)
-
-def get_git_path(owner, repository, branch, filepath):
-    return git_request('/repos/%s/%s/branches' % (owner, repository),).\
-        addCallback(partial(get_branch_sha, branch)).\
-        addCallback(partial(git_get_file_sha, owner, repository, filepath)).\
-        addCallback(partial(git_get_blob, owner, repository)).\
-        addCallback(extract_content).\
-        addErrback(cb_error)
-
 

@@ -1,9 +1,18 @@
+
+from zope.interface import implements
+
 from twisted.web import server, resource
 from twisted.internet import reactor
+from twisted.cred.checkers import FilePasswordDB
+from twisted.web.guard import HTTPAuthSessionWrapper, DigestCredentialFactory
+from twisted.cred.portal import IRealm, Portal
 
-from github import get_git_path
+import github
 
 import wingdbstub
+
+username = 'winjer'
+password = open("token").read().strip()
 
 def ctype(extension):
 
@@ -12,6 +21,9 @@ def ctype(extension):
         'js': 'application/javascript',
         'html': 'text/html',
     }.get(extension, 'text/plain')
+
+
+ghc = github.GitHubClient(username, password)
 
 class Root(resource.Resource):
     isLeaf = True
@@ -29,10 +41,22 @@ class Root(resource.Resource):
             request.setHeader('Content-Type', ctype(extension))
             request.write(data)
             request.finish()
-        get_git_path(owner, repository, branch, filepath).addCallback(_)
+        #get_git_path(owner, repository, branch, filepath).addCallback(_)
         return server.NOT_DONE_YET
 
-site = server.Site(Root())
+class MyRealm(object):
+
+    implements(IRealm)
+
+    def requestAvatar(self, avatarId, mind, *interfaces):
+        if resource.IResource in interfaces:
+            return (resource.IResource, Root(), lambda: None)
+        raise NotImplementedError()
+
+portal = Portal(MyRealm(), [FilePasswordDB('httpd.password')])
+credentialFactory = DigestCredentialFactory("md5", "localhost):8080")
+resource = HTTPAuthSessionWrapper(portal, [credentialFactory])
+site = server.Site(resource)
 reactor.listenTCP(8000, site)
 reactor.run()
 
