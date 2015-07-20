@@ -1,6 +1,7 @@
 
 from zope.interface import implements
 
+from twisted.internet.defer import maybeDeferred
 from twisted.web import server, resource
 from twisted.web.util import DeferredResource
 from twisted.internet import reactor
@@ -172,11 +173,10 @@ class Repository(resource.Resource):
     def getChild(self, branch, request):
         def _(git_branch):
             resource = Branch(git_branch)
-            print "passwd is", git_branch.passwd
             portal = Portal(BranchRealm(resource), [PasswordDB(git_branch.passwd)])
             credentialFactory = BasicCredentialFactory(branch)
             return HTTPAuthSessionWrapper(portal, [credentialFactory])
-        git_branch = ghc.get_branch(self.owner, self.repository, branch)
+        git_branch = maybeDeferred(ghc.get_branch, self.owner, self.repository, branch)
         return DeferredResource(git_branch.addCallback(_))
 
 class Branch(resource.Resource):
@@ -188,6 +188,8 @@ class Branch(resource.Resource):
         self.git_branch = git_branch
 
     def render_GET(self, request):
+        if request.postpath[-1] == 'passwd':
+            return None
         def _(data):
             extension = request.postpath[-1].split(".")[-1]
             request.setHeader('Content-Type', ctype(extension))

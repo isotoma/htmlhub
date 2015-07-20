@@ -1,4 +1,4 @@
-from twisted.internet.defer import Deferred, inlineCallbacks
+from twisted.internet.defer import Deferred, inlineCallbacks, maybeDeferred, returnValue
 from twisted.internet import reactor
 from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
@@ -7,6 +7,7 @@ from twisted.internet.protocol import Protocol
 from functools import partial
 from base64 import b64encode, b64decode
 import json
+import time
 
 def print_error(error):
     print error
@@ -35,11 +36,17 @@ class GitHubClient(object):
 
     def __init__(self, username, password):
         self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
+        self.cache = {}
 
-    def get_branch(self, owner, repository, branch):
-        # todo, a spot of caching
-        branch = GitBranch(self, owner, repository, branch)
+    def get_branch(self, owner, repository, branch_name):
+        now = time.time()
+        when, branch = self.cache.get((owner, repository, branch_name), (None, None))
+        if when is not None:
+            if now - when < 120:
+                return branch
+        branch = GitBranch(self, owner, repository, branch_name)
         def _(ignored):
+            self.cache[(owner, repository, branch_name)] = (now, branch)
             return branch
         return branch.initialise().addCallback(_)
 
@@ -52,7 +59,7 @@ class GitHubClient(object):
 
         agent.request(
             'GET',
-            endpoint + request,
+            str(endpoint + request),
             Headers({
                 'Accept': ['application/vnd.github.v3+json'],
                 'Authorization': [self.authorization],
@@ -73,6 +80,8 @@ class GitBranch(object):
         self.branch_sha = None
         self.html_templates_sha = None
         self.passwd = None
+        self.tree_cache = {}
+        self.blob_cache = {}
 
     def git_request(self, request):
         return self.client.git_request(request)
@@ -97,8 +106,14 @@ class GitBranch(object):
         self.html_templates_sha = yield self.get_html_templates_sha()
         self.passwd = yield self.get_html_file(["passwd"])
 
+    @inlineCallbacks
     def git_tree_request(self, sha):
-            return self.git_request(str('/repos/%s/%s/git/trees/%s' % (self.owner, self.repository, sha)))
+        if sha in self.tree_cache:
+            returnValue(self.tree_cache[sha])
+        else:
+            result = yield self.git_request(str('/repos/%s/%s/git/trees/%s' % (self.owner, self.repository, sha)))
+            self.tree_cache[sha] = result
+            returnValue(result)
 
     def get_html_file(self, segments, parent_sha=None):
         if parent_sha is None:
@@ -117,9 +132,10 @@ class GitBranch(object):
                 return self.git_get_blob(sha)
         return self.git_tree_request(parent_sha).addCallback(_)
 
+    @inlineCallbacks
     def git_get_blob(self, sha):
-        def _(results):
-            return b64decode(results['content'])
-        return self.git_request(
-            str('/repos/%s/%s/git/blobs/%s' % (self.owner, self.repository, sha))
-        ).addCallback(_)
+        if sha in self.blob_cache:
+            returnValue(self.blob_cache[sha])
+        else:
+            value = yield self.git_request('/repos/%s/%s/git/blobs/%s' % (self.owner, self.repository, sha))
+            returnValue(b64decode(value['content']))
