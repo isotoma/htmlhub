@@ -1,4 +1,4 @@
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, inlineCallbacks
 from twisted.internet import reactor
 from twisted.web.client import Agent
 from twisted.web.http_headers import Headers
@@ -7,6 +7,9 @@ from twisted.internet.protocol import Protocol
 from functools import partial
 from base64 import b64encode, b64decode
 import json
+
+def print_error(error):
+    print error
 
 class WebClientContextFactory(ClientContextFactory):
     def getContext(self, hostname, port):
@@ -77,32 +80,22 @@ class GitBranch(object):
     def get_branch_sha(self, results):
         for d in results:
             if d['name'] == self.branch_name:
-                self.branch_sha = d['commit']['sha']
-                return
+                return d['commit']['sha']
         raise KeyError()
 
-    def get_html_templates_sha(self, ignored):
+    def get_html_templates_sha(self):
         def _(results):
             for d in results['tree']:
                 if d['path'] == 'html-templates':
-                    self.html_templates_sha = d['sha']
+                    return d['sha']
         return self.git_tree_request(self.branch_sha).addCallback(_)
 
-    def get_passwd(self, ignored):
-        def _(results):
-            self.passwd = results
-        self.get_html_file(["passwd"]).addCallback(_)
-
+    @inlineCallbacks
     def initialise(self):
-        return self.git_request(
-            '/repos/%s/%s/branches' % (self.owner, self.repository)
-        ).addCallback(
-            self.get_branch_sha
-        ).addCallback(
-            self.get_html_templates_sha
-        ).addCallback(
-            self.get_passwd
-        )
+        r = yield self.git_request('/repos/%s/%s/branches' % (self.owner, self.repository))
+        self.branch_sha = yield self.get_branch_sha(r)
+        self.html_templates_sha = yield self.get_html_templates_sha()
+        self.passwd = yield self.get_html_file(["passwd"])
 
     def git_tree_request(self, sha):
             return self.git_request(str('/repos/%s/%s/git/trees/%s' % (self.owner, self.repository, sha)))
@@ -119,7 +112,7 @@ class GitBranch(object):
             if sha is None:
                 return None
             if segments:
-                return self.git_get_html_file(segments, sha)
+                return self.get_html_file(segments, sha)
             else:
                 return self.git_get_blob(sha)
         return self.git_tree_request(parent_sha).addCallback(_)
