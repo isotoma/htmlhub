@@ -36,26 +36,27 @@ endpoint = "https://api.github.com"
 class GitHubClient(object):
 
 
-    def __init__(self, username, password):
+    def __init__(self, username, password, expiry=120):
         self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
         self.cache = {}
-        reactor.callLater(240, self.housekeeping)
+        self.expiry = expiry
+        reactor.callLater(self.expiry, self.housekeeping)
 
     def housekeeping(self):
         delete = []
         now = time.time()
         for key, value in self.cache.items():
-            if now - value[0] > 120:
+            if now - value[0] > self.expiry:
                 delete.append(key)
         for d in delete:
             del self.cache[d]
-        reactor.callLater(240, self.housekeeping)
+        reactor.callLater(self.expiry, self.housekeeping)
 
     def get_branch(self, owner, repository, branch_name):
         now = time.time()
         when, branch = self.cache.get((owner, repository, branch_name), (None, None))
         if when is not None:
-            if now - when < 120:
+            if now - when < self.expiry:
                 return branch
         branch = GitBranch(self, owner, repository, branch_name)
         def _(ignored):
