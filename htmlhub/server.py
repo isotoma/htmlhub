@@ -10,12 +10,17 @@ from twisted.cred.checkers import FilePasswordDB
 from twisted.web.guard import HTTPAuthSessionWrapper, BasicCredentialFactory
 from twisted.cred.portal import IRealm, Portal
 from twisted.cred import credentials
+from twisted.python import log
 
 from ConfigParser import ConfigParser
+import logging
+import sys
+
 from . import github
-from .util import ctype
+from .util import ctype, initialise_mimetypes
 from .auth import BranchRealm, PasswordDB
 
+logger = logging.getLogger("server")
 
 class HtmlHub(resource.Resource):
 
@@ -88,11 +93,18 @@ class Branch(resource.Resource):
         return server.NOT_DONE_YET
 
 def main():
+    observer = log.PythonLoggingObserver()
+    observer.start()
+    logging.basicConfig(stream=sys.stdout, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    initialise_mimetypes()
     parser = ConfigParser()
     parser.read("htmlhub.conf")
     username = parser.get("github", "username")
     password = parser.get("github", "password")
-    ghc = github.GitHubClient(username, password)
+    expiry = int(parser.get("cache", "expiry"))
+    ghc = github.GitHubClient(username, password, expiry=expiry)
     site = server.Site(HtmlHub(ghc))
     reactor.listenTCP(8000, site)
     reactor.run()
