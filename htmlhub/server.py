@@ -19,6 +19,7 @@ class HtmlHub(resource.Resource):
     isLeaf = False
 
     def __init__(self, github_client):
+        resource.Resource.__init__(self)
         self.github_client = github_client
 
     def render_GET(self, request):
