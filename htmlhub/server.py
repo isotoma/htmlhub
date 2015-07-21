@@ -197,7 +197,7 @@ class Branch(resource.Resource):
         self.git_branch.get_html_file(request.postpath[:]).addCallback(_)
         return server.NOT_DONE_YET
 
-if __name__ == '__main__':
+def main():
     parser = ConfigParser()
     parser.read("htmlhub.conf")
     username = parser.get("github", "username")
