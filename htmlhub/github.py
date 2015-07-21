@@ -1,3 +1,5 @@
+from __future__ import absolute_import, print_function
+
 from twisted.internet.defer import Deferred, inlineCallbacks, maybeDeferred, returnValue
 from twisted.internet import reactor
 from twisted.web.client import Agent
@@ -10,7 +12,7 @@ import json
 import time
 
 def print_error(error):
-    print error
+    print(error)
 
 class WebClientContextFactory(ClientContextFactory):
     def getContext(self, hostname, port):
@@ -40,14 +42,12 @@ class GitHubClient(object):
         reactor.callLater(240, self.housekeeping)
 
     def housekeeping(self):
-        print "housekeeping"
         delete = []
         now = time.time()
         for key, value in self.cache.items():
             if now - value[0] > 120:
                 delete.append(key)
         for d in delete:
-            print "deleting", d
             del self.cache[d]
         reactor.callLater(240, self.housekeeping)
 
@@ -64,7 +64,7 @@ class GitHubClient(object):
         return branch.initialise().addCallback(_)
 
     def git_request(self, request):
-        print request
+        print(request)
         finished = Deferred()
 
         def cb_response(response):
