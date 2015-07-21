@@ -10,10 +10,8 @@ from twisted.web.guard import HTTPAuthSessionWrapper, BasicCredentialFactory
 from twisted.cred.portal import IRealm, Portal
 from twisted.cred import credentials
 
+from ConfigParser import ConfigParser
 import github
-
-username = 'winjer'
-password = open("token").read().strip()
 
 def ctype(extension):
 
@@ -23,31 +21,33 @@ def ctype(extension):
         'html': 'text/html',
     }.get(extension, 'text/plain')
 
-ghc = github.GitHubClient(username, password)
-
-class Root(resource.Resource):
+class HtmlHub(resource.Resource):
 
     isLeaf = False
+
+    def __init__(self, github_client):
+        self.github_client = github_client
 
     def render_GET(self, request):
         return "<html>URLs should look like /:owner/:repos/:branch/path/to/file.html</html>"
 
     def getChild(self, owner, request):
-        return Owner(owner)
+        return Owner(self.github_client, owner)
 
 class Owner(resource.Resource):
 
     isLeaf = False
 
-    def __init__(self, owner):
+    def __init__(self, github_client, owner):
         resource.Resource.__init__(self)
+        self.github_client = github_client
         self.owner = owner
 
     def render_GET(self, request):
         return "<html>URLs should look like /:owner/:repos/:branch/path/to/file.html</html>"
 
     def getChild(self, repository, request):
-        return Repository(self.owner, repository)
+        return Repository(self.github_client, self.owner, repository)
 
 
 class BranchRealm(object):
@@ -160,8 +160,9 @@ class PasswordDB(FilePasswordDB):
 class Repository(resource.Resource):
     isLeaf = False
 
-    def __init__(self, owner, repository):
+    def __init__(self, github_client, owner, repository):
         resource.Resource.__init__(self)
+        self.github_client = github_client
         self.owner = owner
         self.repository = repository
 
@@ -174,7 +175,7 @@ class Repository(resource.Resource):
             portal = Portal(BranchRealm(resource), [PasswordDB(git_branch.passwd)])
             credentialFactory = BasicCredentialFactory(branch)
             return HTTPAuthSessionWrapper(portal, [credentialFactory])
-        git_branch = maybeDeferred(ghc.get_branch, self.owner, self.repository, branch)
+        git_branch = maybeDeferred(self.github_client.get_branch, self.owner, self.repository, branch)
         return DeferredResource(git_branch.addCallback(_))
 
 class Branch(resource.Resource):
@@ -196,7 +197,13 @@ class Branch(resource.Resource):
         self.git_branch.get_html_file(request.postpath[:]).addCallback(_)
         return server.NOT_DONE_YET
 
-site = server.Site(Root())
-reactor.listenTCP(8000, site)
-reactor.run()
+if __name__ == '__main__':
+    parser = ConfigParser()
+    parser.read("htmlhub.conf")
+    username = parser.get("github", "username")
+    password = parser.get("github", "password")
+    ghc = github.GitHubClient(username, password)
+    site = server.Site(HtmlHub(ghc))
+    reactor.listenTCP(8000, site)
+    reactor.run()
 
