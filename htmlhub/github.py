@@ -70,7 +70,7 @@ class GitHubClient(object):
         return branch.initialise().addCallback(_)
 
     def git_request(self, request):
-        logger.info("Requesting %s" % request)
+        logger.debug("Requesting %s" % request)
         finished = Deferred()
 
         def cb_response(response):
@@ -90,6 +90,11 @@ class GitHubClient(object):
         return finished
 
 class GitBranch(object):
+
+    delim = ":"
+    ufield = 0
+    pfield = 1
+    caseSensitive = False
 
     def __init__(self, client, owner, repository, branch_name):
         self.client = client
@@ -123,7 +128,21 @@ class GitBranch(object):
         r = yield self.git_request('/repos/%s/%s/branches' % (self.owner, self.repository))
         self.branch_sha = yield self.get_branch_sha(r)
         self.html_templates_sha = yield self.get_html_templates_sha()
-        self.passwd = yield self.get_html_file(["passwd"])
+        passwd = yield self.get_html_file(["passwd"])
+        self.passwd = dict(self._loadCredentials(passwd))
+
+    def _loadCredentials(self, passwd):
+        for line in passwd.splitlines():
+            line = line.rstrip()
+            parts = line.split(self.delim)
+
+            if self.ufield >= len(parts) or self.pfield >= len(parts):
+                continue
+            if self.caseSensitive:
+                yield parts[self.ufield], parts[self.pfield]
+            else:
+                yield parts[self.ufield].lower(), parts[self.pfield]
+
 
     @inlineCallbacks
     def git_tree_request(self, sha):

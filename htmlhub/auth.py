@@ -6,6 +6,10 @@ from twisted.web import resource
 from twisted.cred import portal
 from twisted.cred import checkers
 
+import logging
+
+logger = logging.getLogger("auth")
+
 class BranchRealm(object):
 
     implements(portal.IRealm)
@@ -94,23 +98,5 @@ class PasswordDB(checkers.FilePasswordDB):
         return magic + salt + '$' + rearranged
 
     def getUser(self, username):
-        if self.cred_cache is None:
-            self.cred_cache = dict(self._loadCredentials())
-        if not self.caseSensitive:
-            username = username.lower()
-        return username, self.cred_cache[username]
-
-    def _loadCredentials(self):
-        for line in self.passwd.splitlines():
-            line = line.rstrip()
-            parts = line.split(self.delim)
-
-            if self.ufield >= len(parts) or self.pfield >= len(parts):
-                continue
-            if self.caseSensitive:
-                yield parts[self.ufield], parts[self.pfield]
-            else:
-                yield parts[self.ufield].lower(), parts[self.pfield]
-
-
+        return username, self.passwd[username]
 
