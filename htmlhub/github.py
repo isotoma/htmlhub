@@ -10,10 +10,14 @@ from functools import partial
 from base64 import b64encode, b64decode
 import json
 import time
+import logging
+
+logger = logging.getLogger("github")
 
 _HTTP11ClientFactory.noisy = False
+
 def print_error(error):
-    print(error)
+    logging.error(error)
 
 class WebClientContextFactory(ClientContextFactory):
     def getContext(self, hostname, port):
@@ -66,7 +70,7 @@ class GitHubClient(object):
         return branch.initialise().addCallback(_)
 
     def git_request(self, request):
-        print(request)
+        logger.info("Requesting %s" % request)
         finished = Deferred()
 
         def cb_response(response):
