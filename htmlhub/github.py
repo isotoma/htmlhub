@@ -2,7 +2,7 @@ from __future__ import absolute_import, print_function
 
 from twisted.internet.defer import Deferred, inlineCallbacks, maybeDeferred, returnValue
 from twisted.internet import reactor
-from twisted.web.client import Agent
+from twisted.web.client import Agent, _HTTP11ClientFactory
 from twisted.web.http_headers import Headers
 from twisted.internet.ssl import ClientContextFactory
 from twisted.internet.protocol import Protocol
@@ -11,6 +11,7 @@ from base64 import b64encode, b64decode
 import json
 import time
 
+_HTTP11ClientFactory.noisy = False
 def print_error(error):
     print(error)
 

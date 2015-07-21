@@ -105,7 +105,7 @@ def main():
     password = parser.get("github", "password")
     expiry = int(parser.get("cache", "expiry"))
     ghc = github.GitHubClient(username, password, expiry=expiry)
-    site = server.Site(HtmlHub(ghc))
+    site = server.Site(HtmlHub(ghc), logPath="/dev/null")
     reactor.listenTCP(8000, site)
     reactor.run()
 

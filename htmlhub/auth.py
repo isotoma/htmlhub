@@ -22,6 +22,7 @@ class PasswordDB(checkers.FilePasswordDB):
 
     def __init__(self, passwd):
         self.passwd = passwd
+        self.cred_cache = None
         checkers.FilePasswordDB.__init__(self, None, hash=self.apache_md5)
 
     def apache_md5(self, username, password, entry_password):
@@ -93,13 +94,11 @@ class PasswordDB(checkers.FilePasswordDB):
         return magic + salt + '$' + rearranged
 
     def getUser(self, username):
+        if self.cred_cache is None:
+            self.cred_cache = dict(self._loadCredentials())
         if not self.caseSensitive:
             username = username.lower()
-
-        for u, p in self._loadCredentials():
-            if u == username:
-                return u, p
-            raise KeyError(username)
+        return username, self.cred_cache[username]
 
     def _loadCredentials(self):
         for line in self.passwd.splitlines():
