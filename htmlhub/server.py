@@ -12,14 +12,7 @@ from twisted.cred import credentials
 
 from ConfigParser import ConfigParser
 import github
-
-def ctype(extension):
-
-    return {
-        'css': 'text/css',
-        'js': 'application/javascript',
-        'html': 'text/html',
-    }.get(extension, 'text/plain')
+from util import ctype
 
 class HtmlHub(resource.Resource):
 
