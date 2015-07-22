@@ -111,6 +111,9 @@ class GitBranch(object):
         return self.client.git_request(request)
 
     def get_branch_sha(self, results):
+        # we get a dict back if its an error
+        if type(results) is dict:
+            raise KeyError()
         for d in results:
             if d['name'] == self.branch_name:
                 return d['commit']['sha']
