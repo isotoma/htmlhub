@@ -111,3 +111,10 @@ command line.
 
 Then add the file to the repository and push it.
 
+MIME Types
+----------
+
+htmlhub guesses the mime types of files based on the contents of the file
+/etc/mime.types.  This means it works pretty much like Apache in terms of what
+it can serve, and how it serves those files.
+
