@@ -31,14 +31,21 @@ you can serve these pages as if they were coming from a local checkout.
 Security
 --------
 
-An htmlhub server will only serve files from within a directory called `html-templates` at the root of a repository.
+The github API user should only have read-only access to your repositories, and
+should have repository access added on an individual basis.
+
+An htmlhub server will only serve files from within a directory called
+`html-templates` at the root of a branch.
 
 It will only serve files from `html-templates` directories that contain a file
 called `passwd`.
 
 It also provides authentication.  The `passwd` file is parsed like an apache
 **htpasswd** format file, requiring authentication before showing the
-templates.
+templates.  The username and password should match a row in the password file.
+
+The password file itself is hashed.  Write access to the password file is
+determined by having write access to the repository itself.
 
 Using htmlhub
 =============
