@@ -15,6 +15,7 @@ from twisted.python import log
 
 from ConfigParser import ConfigParser
 import logging
+import os
 import sys
 
 from . import github
@@ -113,7 +114,7 @@ def main():
     root.setLevel(logging.DEBUG)
     initialise_mimetypes()
     parser = ConfigParser()
-    parser.read("htmlhub.conf")
+    parser.read(os.path.join(sys.prefix, "etc", "htmlhub.conf"))
     username = parser.get("github", "username")
     password = parser.get("github", "password")
     expiry = int(parser.get("cache", "expiry"))
