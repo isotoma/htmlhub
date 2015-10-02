@@ -3,15 +3,16 @@ from __future__ import absolute_import, print_function
 import base64
 import crypt
 import hashlib
-
-from zope.interface import implements
-from twisted.web import resource
-from twisted.cred import portal
-from twisted.cred import checkers
-
 import logging
 
+from twisted.cred import checkers
+from twisted.cred import portal
+from twisted.web import resource
+from zope.interface import implements
+
+
 logger = logging.getLogger("auth")
+
 
 class BranchRealm(object):
 
@@ -24,6 +25,7 @@ class BranchRealm(object):
         if resource.IResource in interfaces:
             return (resource.IResource, self.branch, lambda: None)
         raise NotImplementedError()
+
 
 class PasswordDB(checkers.FilePasswordDB):
 
@@ -46,7 +48,9 @@ class PasswordDB(checkers.FilePasswordDB):
 
     # From: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/325204
     def apache_md5crypt(self, password, salt, magic='$apr1$'):
-        # /* The password first, since that is what is most unknown */ /* Then our magic string */ /* Then the raw salt */
+        # The password first, since that is what is most unknown
+        # Then our magic string
+        # Then the raw salt
         m = hashlib.md5()
         m.update(password + magic + salt)
 
@@ -96,14 +100,15 @@ class PasswordDB(checkers.FilePasswordDB):
         for a, b, c in ((0, 6, 12), (1, 7, 13), (2, 8, 14), (3, 9, 15), (4, 10, 5)):
             v = ord(final[a]) << 16 | ord(final[b]) << 8 | ord(final[c])
             for i in range(4):
-                rearranged += itoa64[v & 0x3f]; v >>= 6
+                rearranged += itoa64[v & 0x3f]
+                v >>= 6
 
         v = ord(final[11])
         for i in range(2):
-            rearranged += itoa64[v & 0x3f]; v >>= 6
+            rearranged += itoa64[v & 0x3f]
+            v >>= 6
 
         return magic + salt + '$' + rearranged
 
     def getUser(self, username):
         return username, self.passwd[username]
-
