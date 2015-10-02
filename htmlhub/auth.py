@@ -41,7 +41,7 @@ class PasswordDB(checkers.FilePasswordDB):
             expected = '{SHA}' + base64.b64encode(hashlib.sha1(password).digest())
             return expected
         salt = entry_password[:2]
-        expected = salt + crypt.crypt(password, salt)
+        expected = crypt.crypt(password, salt)
         return expected
 
     # From: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/325204
