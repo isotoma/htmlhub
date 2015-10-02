@@ -2,6 +2,12 @@ from setuptools import setup, find_packages
 
 
 version = '0.0.dev0'
+tests_require = [
+    'unittest2',
+    'mock',
+    'nose',
+    ]
+
 
 setup(name='htmlhub',
       version=version,
@@ -27,8 +33,10 @@ setup(name='htmlhub',
           'PyOpenSSL',
           'service_identity',
       ],
+      tests_require=tests_require,
+      test_suite='nose.collector',
       extras_require={
-          'test': ['unittest2', 'mock'],
+          'test': tests_require,
           },
       entry_points="""
       [console_scripts]
