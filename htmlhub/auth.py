@@ -1,14 +1,18 @@
-
 from __future__ import absolute_import, print_function
 
-from zope.interface import implements
-from twisted.web import resource
-from twisted.cred import portal
-from twisted.cred import checkers
-
+import base64
+import crypt
+import hashlib
 import logging
 
+from twisted.cred import checkers
+from twisted.cred import portal
+from twisted.web import resource
+from zope.interface import implements
+
+
 logger = logging.getLogger("auth")
+
 
 class BranchRealm(object):
 
@@ -22,29 +26,36 @@ class BranchRealm(object):
             return (resource.IResource, self.branch, lambda: None)
         raise NotImplementedError()
 
+
 class PasswordDB(checkers.FilePasswordDB):
 
     def __init__(self, passwd):
         self.passwd = passwd
         self.cred_cache = None
-        checkers.FilePasswordDB.__init__(self, None, hash=self.apache_md5)
+        checkers.FilePasswordDB.__init__(self, None, hash=self.apache)
 
-    def apache_md5(self, username, password, entry_password):
+    def apache(self, username, password, entry_password):
         if entry_password.startswith('$apr1$'):
             salt = entry_password[6:].split('$')[0][:8]
             expected = self.apache_md5crypt(password, salt)
             return expected
-        raise NotImplementedError()
+        elif entry_password.startswith('{SHA}'):
+            expected = '{SHA}' + base64.b64encode(hashlib.sha1(password).digest())
+            return expected
+        salt = entry_password[:2]
+        expected = crypt.crypt(password, salt)
+        return expected
 
     # From: http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/325204
     def apache_md5crypt(self, password, salt, magic='$apr1$'):
-        # /* The password first, since that is what is most unknown */ /* Then our magic string */ /* Then the raw salt */
-        import md5
-        m = md5.new()
+        # The password first, since that is what is most unknown
+        # Then our magic string
+        # Then the raw salt
+        m = hashlib.md5()
         m.update(password + magic + salt)
 
         # /* Then just as many characters of the MD5(pw,salt,pw) */
-        mixin = md5.md5(password + salt + password).digest()
+        mixin = hashlib.md5(password + salt + password).digest()
         for i in range(0, len(password)):
             m.update(mixin[i % 16])
 
@@ -62,7 +73,7 @@ class PasswordDB(checkers.FilePasswordDB):
 
         # /* and now, just to make sure things don't run too fast */
         for i in range(1000):
-            m2 = md5.md5()
+            m2 = hashlib.md5()
             if i & 1:
                 m2.update(password)
             else:
@@ -89,14 +100,15 @@ class PasswordDB(checkers.FilePasswordDB):
         for a, b, c in ((0, 6, 12), (1, 7, 13), (2, 8, 14), (3, 9, 15), (4, 10, 5)):
             v = ord(final[a]) << 16 | ord(final[b]) << 8 | ord(final[c])
             for i in range(4):
-                rearranged += itoa64[v & 0x3f]; v >>= 6
+                rearranged += itoa64[v & 0x3f]
+                v >>= 6
 
         v = ord(final[11])
         for i in range(2):
-            rearranged += itoa64[v & 0x3f]; v >>= 6
+            rearranged += itoa64[v & 0x3f]
+            v >>= 6
 
         return magic + salt + '$' + rearranged
 
     def getUser(self, username):
         return username, self.passwd[username]
-

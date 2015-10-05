@@ -125,3 +125,33 @@ htmlhub guesses the mime types of files based on the contents of the file
 /etc/mime.types.  This means it works pretty much like Apache in terms of what
 it can serve, and how it serves those files.
 
+Developing
+==========
+
+Set up a virtual environment::
+
+    virtualenv -p python2.7 --no-site-packages .
+
+Install the dev requirements from ``requirements-dev.txt``::
+
+    bin/pip install -r requirements-dev.txt
+
+Update the change log before you submit a pull request.
+
+Running the server
+------------------
+::
+
+    bin/htmlhub
+
+Running the tests
+-----------------
+::
+
+    bin/nose htmlhub
+
+Making a release
+----------------
+::
+
+    bin/fullrelease
