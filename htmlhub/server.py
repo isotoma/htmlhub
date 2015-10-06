@@ -77,6 +77,7 @@ class Repository(Resource):
             credentialFactory = BasicCredentialFactory(branch)
             returnValue(HTTPAuthSessionWrapper(portal, [credentialFactory]))
         except KeyError:
+            print("Cannot find branch %s" % branch)
             returnValue(NoResource())
 
     def getChild(self, branch, request):
