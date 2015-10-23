@@ -114,7 +114,7 @@ Check out the repository and change into the html-templates directory, then::
 
 Will create a password file called `passwd` with that user in it.  The ``-c``
 option creates a new file and ``-b`` means the password is specified on the
-command line. **Ommit ``-c`` to append a value to the password file.**
+command line. **Omit -c to append a value to the password file.**
 
 Then add the file to the repository and push it.
 
