@@ -1,45 +1,48 @@
 from __future__ import absolute_import, print_function
 
-from twisted.internet.defer import Deferred, inlineCallbacks, maybeDeferred, returnValue
+from base64 import b64encode, b64decode
+import json
+import logging
+import time
+
+from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
 from twisted.internet import reactor
 from twisted.web.client import Agent, _HTTP11ClientFactory
 from twisted.web.http_headers import Headers
 from twisted.internet.ssl import ClientContextFactory
 from twisted.internet.protocol import Protocol
-from functools import partial
-from base64 import b64encode, b64decode
-import json
-import time
-import logging
 
 logger = logging.getLogger("github")
 
 _HTTP11ClientFactory.noisy = False
 
+
 def print_error(error):
     logging.error(error)
+
 
 class WebClientContextFactory(ClientContextFactory):
     def getContext(self, hostname, port):
         return ClientContextFactory.getContext(self)
+
 
 class JSONProtocol(Protocol):
     def __init__(self, finished):
         self.finished = finished
         self.data = []
 
-    def dataReceived(self, bytes):
-        self.data.append(bytes)
+    def dataReceived(self, bytes_):
+        self.data.append(bytes_)
 
     def connectionLost(self, reason):
         self.finished.callback(json.loads("".join(self.data)))
+
 
 agent = Agent(reactor, WebClientContextFactory())
 endpoint = "https://api.github.com"
 
 
 class GitHubClient(object):
-
 
     def __init__(self, username, password, expiry=120):
         self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
@@ -64,13 +67,15 @@ class GitHubClient(object):
             if now - when < self.expiry:
                 return branch
         branch = GitBranch(self, owner, repository, branch_name)
+
         def _(ignored):
             self.cache[(owner, repository, branch_name)] = (now, branch)
             return branch
+
         return branch.initialise().addCallback(_)
 
     def git_request(self, request):
-        logger.debug("Requesting %s" % request)
+        logger.debug("Requesting %s", request)
         finished = Deferred()
 
         def cb_response(response):
@@ -88,6 +93,7 @@ class GitHubClient(object):
         ).addCallback(cb_response)
 
         return finished
+
 
 class GitBranch(object):
 
@@ -128,7 +134,10 @@ class GitBranch(object):
 
     @inlineCallbacks
     def initialise(self):
-        r = yield self.git_request('/repos/%s/%s/branches' % (self.owner, self.repository))
+        branch_list_addr = '/repos/{owner}/{repo}/branches'.format(
+            owner=self.owner, repo=self.repository
+            )
+        r = yield self.git_request(branch_list_addr)
         self.branch_sha = yield self.get_branch_sha(r)
         self.html_templates_sha = yield self.get_html_templates_sha()
         passwd = yield self.get_html_file(["passwd"])
@@ -146,19 +155,22 @@ class GitBranch(object):
             else:
                 yield parts[self.ufield].lower(), parts[self.pfield]
 
-
     @inlineCallbacks
     def git_tree_request(self, sha):
         if sha in self.tree_cache:
             returnValue(self.tree_cache[sha])
         else:
-            result = yield self.git_request(str('/repos/%s/%s/git/trees/%s' % (self.owner, self.repository, sha)))
+            tree_addr = '/repos/{owner}/{repo}/git/trees/{revision}'.format(
+                owner=self.owner, repo=self.repository, revision=sha
+                )
+            result = yield self.git_request(tree_addr)
             self.tree_cache[sha] = result
             returnValue(result)
 
     def get_html_file(self, segments, parent_sha=None):
         if parent_sha is None:
             parent_sha = self.html_templates_sha
+
         def _(results):
             leaf = segments.pop(0)
             sha = None
@@ -171,6 +183,7 @@ class GitBranch(object):
                 return self.get_html_file(segments, sha)
             else:
                 return self.git_get_blob(sha)
+
         return self.git_tree_request(parent_sha).addCallback(_)
 
     @inlineCallbacks
@@ -178,5 +191,8 @@ class GitBranch(object):
         if sha in self.blob_cache:
             returnValue(self.blob_cache[sha])
         else:
-            value = yield self.git_request('/repos/%s/%s/git/blobs/%s' % (self.owner, self.repository, sha))
+            blob_addr = '/repos/{owner}/{repo}/git/blobs/{revision}'.format(
+                owner=self.owner, repo=self.repository, revision=sha
+                )
+            value = yield self.git_request(blob_addr)
             returnValue(b64decode(value['content']))

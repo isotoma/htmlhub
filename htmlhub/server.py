@@ -1,28 +1,26 @@
-
 from __future__ import absolute_import, print_function
-from zope.interface import implements
-
-from twisted.internet.defer import maybeDeferred, inlineCallbacks, returnValue
-from twisted.web import server
-from twisted.web.resource import Resource, NoResource
-from twisted.web.util import DeferredResource
-from twisted.internet import reactor
-from twisted.cred.checkers import FilePasswordDB
-from twisted.web.guard import HTTPAuthSessionWrapper, BasicCredentialFactory
-from twisted.cred.portal import IRealm, Portal
-from twisted.cred import credentials
-from twisted.python import log
 
 from ConfigParser import ConfigParser
 import logging
 import os
 import sys
 
+from twisted.internet.defer import maybeDeferred, inlineCallbacks, returnValue
+from twisted.web import server
+from twisted.web.resource import Resource, NoResource
+from twisted.web.util import DeferredResource
+from twisted.internet import reactor
+from twisted.web.guard import HTTPAuthSessionWrapper, BasicCredentialFactory
+from twisted.cred.portal import Portal
+from twisted.python import log
+from zope.interface import implements
+
 from . import github
 from .util import ctype, initialise_mimetypes
 from .auth import BranchRealm, PasswordDB
 
 logger = logging.getLogger("server")
+
 
 class HtmlHub(Resource):
 
@@ -37,6 +35,7 @@ class HtmlHub(Resource):
 
     def getChild(self, owner, request):
         return Owner(self.github_client, owner)
+
 
 class Owner(Resource):
 
@@ -71,7 +70,8 @@ class Repository(Resource):
         if not branch:
             returnValue(self)
         try:
-            git_branch = yield maybeDeferred(self.github_client.get_branch, self.owner, self.repository, branch)
+            git_branch = yield maybeDeferred(self.github_client.get_branch, self.owner,
+                                             self.repository, branch)
             resource = Branch(git_branch)
             portal = Portal(BranchRealm(resource), [PasswordDB(git_branch.passwd)])
             credentialFactory = BasicCredentialFactory(branch)
@@ -82,6 +82,7 @@ class Repository(Resource):
 
     def getChild(self, branch, request):
         return DeferredResource(self._getChild(branch, request))
+
 
 class Branch(Resource):
 
@@ -99,13 +100,16 @@ class Branch(Resource):
             return self.render_index(request)
         if request.postpath[-1] == 'passwd':
             return None
+
         def _(data):
             extension = request.postpath[-1].split(".")[-1]
             request.setHeader('Content-Type', ctype(extension))
             request.write(data)
             request.finish()
+
         self.git_branch.get_html_file(request.postpath[:]).addCallback(_)
         return server.NOT_DONE_YET
+
 
 def main():
     observer = log.PythonLoggingObserver()
@@ -123,4 +127,3 @@ def main():
     site = server.Site(HtmlHub(ghc), logPath="/dev/null")
     reactor.listenTCP(8000, site)
     reactor.run()
-
