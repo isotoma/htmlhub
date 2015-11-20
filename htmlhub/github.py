@@ -1,8 +1,12 @@
 from __future__ import absolute_import, print_function
 
+import abc
 from base64 import b64encode, b64decode
+import functools
 import json
 import logging
+import os.path
+import stat
 import time
 
 from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
@@ -26,6 +30,49 @@ class WebClientContextFactory(ClientContextFactory):
         return ClientContextFactory.getContext(self)
 
 
+class GitError(RuntimeError):
+
+    __metaclass__ = abc.ABCMeta
+
+
+class BranchNotFound(ValueError):
+
+    def __init__(self, name, *args, **kwargs):
+        self.name = name
+        ValueError.__init__(self, *args, **kwargs)
+
+    def __str__(self):
+        return 'Branch {!r} not found'.format(self.name)
+
+
+GitError.register(BranchNotFound)
+
+
+class ExpectedFileButGotDirectory(ValueError):
+
+    pass
+
+
+GitError.register(ExpectedFileButGotDirectory)
+
+
+class UnsupportedBlobMode(TypeError):
+
+    def __init__(self, path, mode, *args, **kwargs):
+        self.path = path
+        self.mode = mode
+        TypeError.__init__(self, path, mode, *args, **kwargs)
+
+    def __str__(self, *args, **kwargs):
+        return 'Mode {} of {} is unsupported.'.format(
+            oct(self.mode),
+            self.path,
+            )
+
+
+GitError.register(UnsupportedBlobMode)
+
+
 class JSONProtocol(Protocol):
     def __init__(self, finished):
         self.finished = finished
@@ -45,7 +92,9 @@ endpoint = "https://api.github.com"
 class GitHubClient(object):
 
     def __init__(self, username, password, expiry=120):
-        self.authorization = "Basic " + str(b64encode("%s:%s" % (username, password)).decode("ascii"))
+        self.authorization = "Basic {}".format(
+            b64encode("%s:%s" % (username, password)).decode("ascii")
+            )
         self.cache = {}
         self.expiry = expiry
         reactor.callLater(self.expiry, self.housekeeping)
@@ -119,11 +168,11 @@ class GitBranch(object):
     def get_branch_sha(self, results):
         # we get a dict back if its an error
         if type(results) is dict:
-            raise KeyError()
+            raise GitError(results)
         for d in results:
             if d['name'] == self.branch_name:
                 return d['commit']['sha']
-        raise KeyError()
+        raise BranchNotFound(self.branch_name)
 
     def get_html_templates_sha(self):
         def _(results):
@@ -167,24 +216,48 @@ class GitBranch(object):
             self.tree_cache[sha] = result
             returnValue(result)
 
-    def get_html_file(self, segments, parent_sha=None):
+    @inlineCallbacks
+    def git_resolve_link(self, sha, consumed, remaining):
+        target = yield self.git_get_blob(sha)
+        # We allow symbolic links to escape 'html-templates'
+        real_path = os.path.abspath(os.path.join(
+            os.path.sep,
+            os.path.sep.join(consumed),
+            target
+            )).split('/')[1:] + remaining
+        resolved = yield self.get_html_file(real_path, self.branch_sha)
+        returnValue(resolved)
+
+    def _get_html_file_callback(self, segments, consumed, results):
+        leaf = segments.pop(0)
+        consumed.append(leaf)
+        sha = None
+        for d in results['tree']:
+            if d['path'] == leaf:
+                sha = d['sha']
+                break
+        if sha is None:
+            return None
+        mode = int(d['mode'], 8)
+        if stat.S_ISDIR(mode):
+            if not segments:
+                raise ExpectedFileButGotDirectory(os.path.sep.join(consumed))
+            return self.get_html_file(segments, sha, consumed)
+        elif stat.S_ISLNK(mode):  # is symlink
+            # -1 because it's relative to the parent of the symlink
+            return self.git_resolve_link(sha, consumed[:-1], segments)
+        elif stat.S_ISREG(mode):
+            return self.git_get_blob(sha)
+        raise UnsupportedBlobMode(os.path.join(*consumed), mode)
+
+    def get_html_file(self, segments, parent_sha=None, consumed=None):
         if parent_sha is None:
             parent_sha = self.html_templates_sha
+        if consumed is None:
+            consumed = ['html-templates']
 
-        def _(results):
-            leaf = segments.pop(0)
-            sha = None
-            for d in results['tree']:
-                if d['path'] == leaf:
-                    sha = d['sha']
-            if sha is None:
-                return None
-            if segments:
-                return self.get_html_file(segments, sha)
-            else:
-                return self.git_get_blob(sha)
-
-        return self.git_tree_request(parent_sha).addCallback(_)
+        callback = functools.partial(self._get_html_file_callback, segments, consumed)
+        return self.git_tree_request(parent_sha).addCallback(callback)
 
     @inlineCallbacks
     def git_get_blob(self, sha):

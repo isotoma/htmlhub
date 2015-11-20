@@ -76,8 +76,11 @@ class Repository(Resource):
             portal = Portal(BranchRealm(resource), [PasswordDB(git_branch.passwd)])
             credentialFactory = BasicCredentialFactory(branch)
             returnValue(HTTPAuthSessionWrapper(portal, [credentialFactory]))
-        except KeyError:
+        except github.BranchNotFound:
             print("Cannot find branch %s" % branch)
+            returnValue(NoResource())
+        except github.GitError:
+            print("Git error")
             returnValue(NoResource())
 
     def getChild(self, branch, request):
