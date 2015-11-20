@@ -35,7 +35,9 @@ The github API user should only have read-only access to your repositories, and
 should have repository access added on an individual basis.
 
 An htmlhub server will only serve files from within a directory called
-`html-templates` at the root of a branch.
+`html-templates` at the root of a branch. The only exception to this is if the
+`html-templates` directory contains symbolic links pointing to other
+locations.
 
 It will only serve files from `html-templates` directories that contain a file
 called `passwd`.
