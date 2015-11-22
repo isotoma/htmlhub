@@ -35,17 +35,23 @@ class GitError(RuntimeError):
     __metaclass__ = abc.ABCMeta
 
 
-class BranchNotFound(ValueError):
+class NotFound(ValueError):
 
     def __init__(self, name, *args, **kwargs):
         self.name = name
         ValueError.__init__(self, *args, **kwargs)
 
     def __str__(self):
+        return '{!r} not found'.format(self.name)
+
+
+GitError.register(NotFound)
+
+
+class BranchNotFound(NotFound):
+
+    def __str__(self):
         return 'Branch {!r} not found'.format(self.name)
-
-
-GitError.register(BranchNotFound)
 
 
 class ExpectedFileButGotDirectory(ValueError):
@@ -91,7 +97,8 @@ DEFAULT_ENDPOINT = "https://api.github.com"
 
 class GitHubClient(object):
 
-    def __init__(self, username, password, expiry=120, endpoint=None):
+    def __init__(self, username, password, expiry=120, endpoint=None,
+                 index_files=None):
         self.authorization = "Basic {}".format(
             b64encode("%s:%s" % (username, password)).decode("ascii")
             )
@@ -100,6 +107,9 @@ class GitHubClient(object):
         if endpoint is None:
             endpoint = DEFAULT_ENDPOINT
         self.endpoint = endpoint
+        if index_files is None:
+            index_files = []
+        self.index_files = index_files
         reactor.callLater(self.expiry, self.housekeeping)
 
     def housekeeping(self):
@@ -118,7 +128,7 @@ class GitHubClient(object):
         if when is not None:
             if now - when < self.expiry:
                 return branch
-        branch = GitBranch(self, owner, repository, branch_name)
+        branch = GitBranch(self, owner, repository, branch_name, index_files=self.index_files)
 
         def _(ignored):
             self.cache[(owner, repository, branch_name)] = (now, branch)
@@ -154,7 +164,7 @@ class GitBranch(object):
     pfield = 1
     caseSensitive = False
 
-    def __init__(self, client, owner, repository, branch_name):
+    def __init__(self, client, owner, repository, branch_name, index_files):
         self.client = client
         self.owner = owner
         self.repository = repository
@@ -164,6 +174,7 @@ class GitBranch(object):
         self.passwd = None
         self.tree_cache = {}
         self.blob_cache = {}
+        self.index_files = []
 
     def git_request(self, request):
         return self.client.git_request(request)
@@ -231,6 +242,14 @@ class GitBranch(object):
         resolved = yield self.get_html_file(real_path, self.branch_sha)
         returnValue(resolved)
 
+    def try_index_files(sha, consumed):
+        for filename in self.index_files:
+            try:
+                return self.get_html_file([filename], sha, consumed)
+            except NotFound:
+                continue
+        raise ExpectedFileButGotDirectory(os.path.sep.join(consumed))
+
     def _get_html_file_callback(self, segments, consumed, results):
         leaf = segments.pop(0)
         consumed.append(leaf)
@@ -240,11 +259,11 @@ class GitBranch(object):
                 sha = d['sha']
                 break
         if sha is None:
-            return None
+            raise NotFound('{}/{}'.format('/'.join(consumed), leaf))
         mode = int(d['mode'], 8)
         if stat.S_ISDIR(mode):
             if not segments:
-                raise ExpectedFileButGotDirectory(os.path.sep.join(consumed))
+                return self.try_index_files(sha, consumed)
             return self.get_html_file(segments, sha, consumed)
         elif stat.S_ISLNK(mode):  # is symlink
             # -1 because it's relative to the parent of the symlink

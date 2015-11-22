@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 
+import six
 from twisted.internet.defer import maybeDeferred, inlineCallbacks, returnValue
 from twisted.web import server
 from twisted.web.resource import Resource, NoResource
@@ -79,6 +80,9 @@ class Repository(Resource):
         except github.BranchNotFound:
             print("Cannot find branch %s" % branch)
             returnValue(NoResource())
+        except github.NotFound as e:
+            print("Cannot find %s" % e.name)
+            returnValue(NoResource())
         except github.GitError:
             print("Git error")
             returnValue(NoResource())
@@ -126,11 +130,16 @@ def main():
     password = parser.get("github", "password")
     endpoint = parser.get("github", "endpoint")
     expiry = int(parser.get("cache", "expiry"))
+    index_files = list(map(
+        six.text_type.strip,
+        parser.get('github', 'index-files', 'index.html').splitlines()
+        ))
     ghc = github.GitHubClient(
         username,
         password,
         expiry=expiry,
         endpoint=endpoint,
+        index_files=index_files,
         )
     site = server.Site(HtmlHub(ghc), logPath="/dev/null")
     reactor.listenTCP(8000, site)
