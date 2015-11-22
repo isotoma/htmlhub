@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 
-import six
 from twisted.internet.defer import maybeDeferred, inlineCallbacks, returnValue
 from twisted.web import server
 from twisted.web.resource import Resource, NoResource
@@ -131,7 +130,7 @@ def main():
     endpoint = parser.get("github", "endpoint")
     expiry = int(parser.get("cache", "expiry"))
     index_files = list(map(
-        six.text_type.strip,
+        str.strip,
         parser.get('github', 'index-files').splitlines()
         ))
     ghc = github.GitHubClient(

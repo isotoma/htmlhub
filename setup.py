@@ -31,7 +31,6 @@ setup(name='htmlhub',
       install_requires=[
           'PyOpenSSL',
           'service_identity',
-          'six',
           'Twisted',
       ],
       tests_require=tests_require,
