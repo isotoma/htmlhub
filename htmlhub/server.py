@@ -16,7 +16,7 @@ from twisted.python import log
 from zope.interface import implements
 
 from . import github
-from .util import ctype, initialise_mimetypes
+from .util import ctype
 from .auth import BranchRealm, PasswordDB
 
 logger = logging.getLogger("server")
@@ -120,7 +120,6 @@ def main():
     logging.basicConfig(stream=sys.stdout, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
-    initialise_mimetypes()
     parser = ConfigParser()
     parser.read(os.path.join(sys.prefix, "etc", "htmlhub.conf"))
     username = parser.get("github", "username")
