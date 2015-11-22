@@ -124,15 +124,15 @@ def main():
     logging.basicConfig(stream=sys.stdout, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
-    parser = ConfigParser()
+    parser = ConfigParser({'endpoint': None, 'index-files': 'index.html'})
     parser.read(os.path.join(sys.prefix, "etc", "htmlhub.conf"))
     username = parser.get("github", "username")
     password = parser.get("github", "password")
-    endpoint = parser.get("github", "endpoint", None)
+    endpoint = parser.get("github", "endpoint")
     expiry = int(parser.get("cache", "expiry"))
     index_files = list(map(
         six.text_type.strip,
-        parser.get('github', 'index-files', 'index.html').splitlines()
+        parser.get('github', 'index-files').splitlines()
         ))
     ghc = github.GitHubClient(
         username,
