@@ -101,6 +101,26 @@ class Branch(Resource):
     def render_index(self, request):
         return "Branch " + self.git_branch.branch_name
 
+    def render_error(self, failure, request):
+        failure.trap(Exception)
+        if failure.type == github.BranchNotFound:
+            message = u"Cannot find branch %s" % branch
+            status_code = 404
+        elif failure.type == github.NotFound:
+            e = failure.value
+            message = u"Cannot find %s" % e.name
+            status_code = 404
+        elif failure.type == github.GitError:
+            message = u"Git error"
+            status_code = 500
+        else:
+            message = u"Unknown error"
+            status_code = 500
+        request.setResponseCode(status_code)
+        request.setHeader('Content-Type', 'text/plain')
+        request.write(message.encode('utf8'))
+        request.finish()
+
     def render_GET(self, request):
         if not request.postpath:
             return self.render_index(request)
@@ -113,7 +133,9 @@ class Branch(Resource):
             request.write(data)
             request.finish()
 
-        self.git_branch.get_html_file(request.postpath[:]).addCallback(_)
+        deferred = self.git_branch.get_html_file(request.postpath[:]).addCallback(_)
+        deferred.addCallback(_)
+        deferred.addErrback(self.render_error, request)
         return server.NOT_DONE_YET
 
 
