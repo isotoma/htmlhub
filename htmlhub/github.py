@@ -86,17 +86,20 @@ class JSONProtocol(Protocol):
 
 
 agent = Agent(reactor, WebClientContextFactory())
-endpoint = "https://api.github.com"
+DEFAULT_ENDPOINT = "https://api.github.com"
 
 
 class GitHubClient(object):
 
-    def __init__(self, username, password, expiry=120):
+    def __init__(self, username, password, expiry=120, endpoint=None):
         self.authorization = "Basic {}".format(
             b64encode("%s:%s" % (username, password)).decode("ascii")
             )
         self.cache = {}
         self.expiry = expiry
+        if endpoint is None:
+            endpoint = DEFAULT_ENDPOINT
+        self.endpoint = endpoint
         reactor.callLater(self.expiry, self.housekeeping)
 
     def housekeeping(self):
@@ -132,7 +135,7 @@ class GitHubClient(object):
 
         agent.request(
             'GET',
-            str(endpoint + request),
+            str(self.endpoint + request),
             Headers({
                 'Accept': ['application/vnd.github.v3+json'],
                 'Authorization': [self.authorization],

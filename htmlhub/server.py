@@ -124,8 +124,14 @@ def main():
     parser.read(os.path.join(sys.prefix, "etc", "htmlhub.conf"))
     username = parser.get("github", "username")
     password = parser.get("github", "password")
+    endpoint = parser.get("github", "endpoint")
     expiry = int(parser.get("cache", "expiry"))
-    ghc = github.GitHubClient(username, password, expiry=expiry)
+    ghc = github.GitHubClient(
+        username,
+        password,
+        expiry=expiry,
+        endpoint=endpoint,
+        )
     site = server.Site(HtmlHub(ghc), logPath="/dev/null")
     reactor.listenTCP(8000, site)
     reactor.run()
