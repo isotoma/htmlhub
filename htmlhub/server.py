@@ -2,7 +2,7 @@ from __future__ import absolute_import, print_function
 
 from ConfigParser import ConfigParser
 import logging
-import os
+import os.path
 import sys
 
 from twisted.internet.defer import maybeDeferred, inlineCallbacks, returnValue
@@ -105,7 +105,7 @@ class Branch(Resource):
             return None
 
         def _(data):
-            extension = request.postpath[-1].split(".")[-1]
+            extension = os.path.splitext(request.postpath[-1])[-1]
             request.setHeader('Content-Type', ctype(extension))
             request.write(data)
             request.finish()
