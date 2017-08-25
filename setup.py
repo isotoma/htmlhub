@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 
-version = '0.0.dev0'
+version = '0.0.dev1'
 tests_require = [
     'unittest2',
     'mock',
