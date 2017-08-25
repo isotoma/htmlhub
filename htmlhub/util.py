@@ -5,7 +5,8 @@ import mimetypes
 
 
 logger = logging.getLogger("util")
+types = mimetypes.MimeTypes()
 
-
-def ctype(extension):
-    return mimetypes.types_map.get(extension, 'text/plain')
+def ctype(filename):
+    content_type, _ = types.guess_type(filename, False)
+    return content_type or 'text/plain'

@@ -105,8 +105,7 @@ class Branch(Resource):
             return None
 
         def _(data):
-            extension = os.path.splitext(request.postpath[-1])[-1]
-            request.setHeader('Content-Type', ctype(extension))
+            request.setHeader('Content-Type', ctype(request.postpath[-1]))
             request.setHeader('X-Frame-Options', 'SAMEORIGIN')
             request.write(data)
             request.finish()
