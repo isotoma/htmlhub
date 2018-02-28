@@ -79,8 +79,8 @@ class Repository(Resource):
         except github.BranchNotFound:
             print("Cannot find branch %s" % branch)
             returnValue(NoResource())
-        except github.GitError:
-            print("Git error")
+        except github.GitError, e:
+            print(e)
             returnValue(NoResource())
 
     def getChild(self, branch, request):
@@ -123,7 +123,7 @@ def main():
     conffile = os.path.join(sys.prefix, "etc", "htmlhub.conf")
     if os.path.exists(conffile):
         parser = ConfigParser()
-        parser.read()
+        parser.read(conffile)
         username = parser.get("github", "username")
         password = parser.get("github", "password")
         expiry = int(parser.get("cache", "expiry"))
