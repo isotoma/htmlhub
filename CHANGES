@@ -1,10 +1,4 @@
-0.1 (unreleased)
-================
+1.0.0 (unreleased)
+------------------
 
-- Added support for SHA1- & ``crypt(3)``-based passwords in password
-  files.
-
-0.0 (???)
-=========
-
-- Initial version
+- Dockerised
