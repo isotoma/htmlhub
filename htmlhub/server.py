@@ -120,12 +120,19 @@ def main():
     logging.basicConfig(stream=sys.stdout, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
-    parser = ConfigParser()
-    parser.read(os.path.join(sys.prefix, "etc", "htmlhub.conf"))
-    username = parser.get("github", "username")
-    password = parser.get("github", "password")
-    expiry = int(parser.get("cache", "expiry"))
+    conffile = os.path.join(sys.prefix, "etc", "htmlhub.conf")
+    if os.path.exists(conffile):
+        parser = ConfigParser()
+        parser.read()
+        username = parser.get("github", "username")
+        password = parser.get("github", "password")
+        expiry = int(parser.get("cache", "expiry"))
+    else:
+        username = os.environ['GITHUB_USERNAME']
+        password = os.environ['GITHUB_PASSWORD']
+        expiry = int(os.environ['CACHE_EXPIRY'])
+    port = int(os.environ.get('PORT', '8000'))
     ghc = github.GitHubClient(username, password, expiry=expiry)
     site = server.Site(HtmlHub(ghc), logPath="/dev/null")
-    reactor.listenTCP(8000, site)
+    reactor.listenTCP(port, site)
     reactor.run()
