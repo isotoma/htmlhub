@@ -3,10 +3,11 @@ RUN apk add --no-cache build-base libffi-dev openssl-dev
 
 COPY requirements.txt /app/
 WORKDIR /app
-COPY htmlhub /app/htmlhub
 COPY setup.py /app/
 COPY README.rst /app/
 COPY CHANGES /app/
+RUN pip install -r requirements.txt
+COPY htmlhub /app/htmlhub
 RUN pip install -r requirements.txt -e .
 
 FROM python:2-alpine
