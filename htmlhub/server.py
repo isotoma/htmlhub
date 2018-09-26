@@ -98,16 +98,16 @@ class Branch(Resource):
 
     def render_GET(self, request):
         if request.postpath:
-            segments = request.postpath[:]
-            if segments[-1] == '':
-                segments[-1] = self.default_doc
+            self.segments = request.postpath[:]
+            if self.segments[-1] == '':
+                self.segments[-1] = self.default_doc
         else:
-            segments = [self.default_doc]
+            self.segments = [self.default_doc]
 
-        if segments[-1] == 'passwd':
+        if self.segments[-1] == 'passwd':
             return None
 
-        self.content_type = ctype(segments[-1])
+        self.content_type = ctype(self.segments[-1])
 
         def _callback(data):
             request.setHeader('Content-Type', self.content_type)
@@ -117,14 +117,14 @@ class Branch(Resource):
 
         def _errback(failure):
             if failure.type == github.ExpectedFileButGotDirectory:
-                segments.append(self.default_doc)
+                self.segments = request.postpath[:] + [self.default_doc]
                 self.content_type = ctype(self.default_doc)
                 _get_file()
                 return
             request.finish()
 
         def _get_file():
-            self.git_branch.get_html_file(segments).addCallback(_callback).addErrback(_errback)
+            self.git_branch.get_html_file(self.segments).addCallback(_callback).addErrback(_errback)
 
         _get_file()
 
