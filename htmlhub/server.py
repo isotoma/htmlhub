@@ -90,27 +90,44 @@ class Repository(Resource):
 class Branch(Resource):
 
     isLeaf = True
+    default_doc = 'index.html'
 
     def __init__(self, git_branch):
         Resource.__init__(self)
         self.git_branch = git_branch
 
-    def render_index(self, request):
-        return "Branch " + self.git_branch.branch_name
-
     def render_GET(self, request):
-        if not request.postpath:
-            return self.render_index(request)
-        if request.postpath[-1] == 'passwd':
+        if request.postpath:
+            segments = request.postpath[:]
+            if segments[-1] == '':
+                segments[-1] = self.default_doc
+        else:
+            segments = [self.default_doc]
+
+        if segments[-1] == 'passwd':
             return None
 
-        def _(data):
-            request.setHeader('Content-Type', ctype(request.postpath[-1]))
+        self.content_type = ctype(segments[-1])
+
+        def _callback(data):
+            request.setHeader('Content-Type', self.content_type)
             request.setHeader('X-Frame-Options', 'SAMEORIGIN')
             request.write(data)
             request.finish()
 
-        self.git_branch.get_html_file(request.postpath[:]).addCallback(_)
+        def _errback(failure):
+            if failure.type == github.ExpectedFileButGotDirectory:
+                segments.append(self.default_doc)
+                self.content_type = ctype(self.default_doc)
+                _get_file()
+                return
+            request.finish()
+
+        def _get_file():
+            self.git_branch.get_html_file(segments).addCallback(_callback).addErrback(_errback)
+
+        _get_file()
+
         return server.NOT_DONE_YET
 
 
