@@ -130,13 +130,18 @@ it can serve, and how it serves those files.
 Developing
 ==========
 
+Docker::
+
+    docker build -t htmlhub .
+    docker run --rm -it -p 4000:80 htmlhub
+
 Set up a virtual environment::
 
     virtualenv -p python2.7 --no-site-packages .
 
 Install the dev requirements from ``requirements-dev.txt``::
 
-    bin/pip install -r requirements-dev.txt
+    bin/pip install -r requirements-dev.txt -e .
 
 Update the change log before you submit a pull request.
 
