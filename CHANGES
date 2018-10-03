@@ -1,17 +1,22 @@
-1.0.2 (unreleased)
-------------------
+1.2.0
+-----
+
+circleci
+
+1.0.2
+-----
 
 - Nothing changed yet.
 
 
-1.0.1 (2018-02-28)
-------------------
+1.0.1
+-----
 
 - Fix config file bug
 - Print better error
 
 
-1.0.0 (2018-02-28)
-------------------
+1.0.0
+-----
 
 - Dockerised
