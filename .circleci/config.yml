@@ -10,7 +10,7 @@ workflows:
     - push:
         filters:
           branches:
-            ignore: /.*/
+            only: master
           tags:
             only: /.*/
 
