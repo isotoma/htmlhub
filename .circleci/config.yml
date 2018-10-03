@@ -1,0 +1,60 @@
+# Only push staging branch to stage
+# Do NOT push tags
+
+version: 2
+
+workflows:
+  version: 2
+  push:
+    jobs:
+    - push:
+        filters:
+          branches:
+            ignore: /.*/
+          tags:
+            only: /.*/
+
+jobs:
+  
+  push:
+
+    # We use the python image because we want a shiny new awscli, not because this is a python build
+    docker:
+    - image: circleci/python:3.6.1
+
+    working_directory: ~/repo
+
+    steps:
+
+    - checkout
+
+    - setup_remote_docker:
+        docker_layer_caching: true
+
+    - run:
+        name: Push to ECR
+        command: |
+
+          # this extracts the version without the devN prefix, if present
+          VERSION=$(cat version.txt | sed -e's/^\([[:digit:]]\+\.[[:digit:]]\+\.[[:digit:]]\+\).*$/\1/')
+          # if we are building a branch then append the circle details and write them to the version.txt file
+          [ -n "$CIRCLE_BRANCH" ] && {
+              VERSION="$VERSION-$CIRCLE_BUILD_NUM"
+              echo "$VERSION" > version.txt
+          }
+
+          sudo pip install awscli
+
+          docker build -t "local:$VERSION" .
+          docker tag "local:$VERSION" "$AWS_ECR_REGISTRY:$VERSION"
+
+          eval `aws ecr --region eu-west-2 get-login | sed -e's/-e none//'`
+          echo "Pushing $AWS_ECR_REGISTRY:$VERSION"
+          docker push "$AWS_ECR_REGISTRY:$VERSION"
+          # if we are building a tag then also push latest
+          [ -n "$CIRCLE_TAG" ] && {
+              docker tag local:local "$AWS_ECR_REGISTRY:latest"
+              echo "Pushing $AWS_ECR_REGISTRY:latest"
+              docker push "$AWS_ECR_REGISTRY:latest"
+          } || exit 0
+
