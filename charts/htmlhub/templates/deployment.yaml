@@ -30,7 +30,7 @@ spec:
                   values:
                   - {{ .Release.Name }}
       containers:
-      - name: fund-manager
+      - name: html-hub
         image: {{ required "A valid dockerRegistry is required" .Values.DockerRegistry }}/htmlhub
         resources:
           requests:
